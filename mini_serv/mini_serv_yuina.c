@@ -9,6 +9,7 @@
 
 int	server_fd;
 int id = 0;
+
 typedef struct s_client
 {
 	int fd;
@@ -184,7 +185,7 @@ void	accept_client(t_client **client, fd_set *rfds)
 void	handle_client(t_client **client, t_client *target, fd_set *rfds)
 {
 	char	buff[1000000];
-	bzero(&buff, sizeof(buff));
+	memset(buff, 0, sizeof(buff));
 	int bytes = 1000;
 	int total_bytes = 0;
 	while (bytes == 1000 || buff[strlen(buff) - 1] != '\n')
@@ -216,16 +217,8 @@ void	handle_client(t_client **client, t_client *target, fd_set *rfds)
 		memset(buffer, 0, total_bytes + 16);
 		int i = 0;
 		int	index = 0;
-        // if (total_bytes > 100000)
-        // {
-        //     char	str[total_bytes + 16];
-        //     sprintf(str, "total_bytes: %d client %d: %s\n", total_bytes, target->id, buff);
-        //     sendClients(*client, target, str);
-        //     return ;
-        // }
 		while (i <= total_bytes)
 		{
-			// if (buff[i] == '\n' || (buff[i] == '\0' && strlen(buffer) != 0))
 			if (buff[i] == '\n')
 			{
 				char	str[strlen(buffer) + 16];
@@ -240,6 +233,12 @@ void	handle_client(t_client **client, t_client *target, fd_set *rfds)
 				index++;
 			}
 			i++;
+		}
+		if (strlen(buffer) != 0)
+		{
+			char	str[strlen(buffer) + 16];
+			sprintf(str, "client %d: %s\n", target->id, buffer);
+			sendClients(*client, target, str);
 		}
 	}
 }
@@ -281,8 +280,7 @@ void	run(void)
 
 int	main(int argc, char **argv)
 {
-	if (argc != 2)rqda has solved Takahashi!
-mikanami has solved Oyster!
+	if (argc != 2)
 	{
 		write_error("Wrong number of arguments\n");
 		exit(1);
@@ -293,5 +291,3 @@ mikanami has solved Oyster!
 	run();
 	return (0);
 }
-
-
