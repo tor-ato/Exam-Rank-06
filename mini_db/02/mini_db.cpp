@@ -8,19 +8,22 @@
 #include <map>
 #include <fstream>
 #include <signal.h>
+#include <cstdlib>
+
+using namespace std;
 
 #define MAX_CLIENTS 1024
-std::map<std::string, std::string> database;
-std::string filepath;
+map<string, string> database;
+string filepath;
 
 void load_db()
 {
-  std::ifstream file(filepath);
-  std::string line;
-  while (std::getline(file, line))
+  ifstream file(filepath.c_str());
+  string line;
+  while (getline(file, line))
   {
-    std::istringstream ss(line);
-    std::string key, value;
+    istringstream ss(line);
+    string key, value;
     ss >> key >> value;
     database[key] = value;
   }
@@ -28,9 +31,9 @@ void load_db()
 
 void save_db()
 {
-  std::ofstream file(filepath);
-  for (std::map<std::string, std::string>::iterator it = database.begin(); it != database.end(); ++it)
-    file << it->first << " " << it->second << std::endl;
+  ofstream file(filepath.c_str());
+  for (map<string, string>::iterator it = database.begin(); it != database.end(); ++it)
+    file << it->first << " " << it->second << endl;
 }
 
 void signalHandler(int)
@@ -48,15 +51,14 @@ public:
   int _sockfd;
   int _port;
 
-  Socket(int port) : _sockfd(socket(AF_INET, SOCK_STREAM, 0))
+  Socket(int port) : _sockfd(socket(AF_INET, SOCK_STREAM, 0)), _port(port)
   {
     if (_sockfd == -1)
-      throw std::runtime_error("Socket creation failed");
+      throw runtime_error("Socket creation failed");
     memset(&_servaddr, 0, sizeof(_servaddr));
     _servaddr.sin_family = AF_INET;
     _servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     _servaddr.sin_port = htons(port);
-    _port = port;
   }
 
   ~Socket() {
@@ -66,21 +68,21 @@ public:
 
   void bindAndListen() {
     if (bind(_sockfd, (struct sockaddr *)&_servaddr, sizeof(_servaddr)) < 0)
-      throw std::runtime_error("Socket listen failed");
+      throw runtime_error("Socket bind failed");
     if (listen(_sockfd, 5) < 0)
-      throw std::runtime_error("Socket listen failed");
+      throw runtime_error("Socket listen failed");
   }
 
   int acceptClient(struct sockaddr_in &clientAddr) {
     socklen_t clientLen = sizeof(clientAddr);
     int clientSockFd = accept(_sockfd, (struct sockaddr *)&clientAddr, &clientLen);
     if (clientSockFd < 0)
-      throw std::runtime_error("Failed to accept connection");
+      throw runtime_error("Failed to accept connection");
     return clientSockFd;
   }
 
-  std::string pullMessage() {
-    return ("Totally not pulled message");
+  string pullMessage() {
+    return "Totally not pulled message";
   }
 };
 
@@ -107,93 +109,109 @@ private:
   Socket _listeningSocket;
   Client clients[MAX_CLIENTS];
 
+  static string processCommand(const string &input) {
+    istringstream ss(input);
+    string cmd, key, value;
+    ss >> cmd;
+
+    if (cmd == "GET") {
+      ss >> key;
+      value = database[key];
+      if (value.empty()) return "1\n";
+      return "0 " + value + "\n";
+    }
+
+    if (cmd == "POST") {
+      ss >> key >> value;
+      database[key] = value;
+      return "0\n";
+    }
+
+    if (cmd == "DELETE") {
+      ss >> key;
+      if (database.erase(key)) return "0\n";
+      return "1\n";
+    }
+
+    return "2\n";
+  }
+
+  static void disconnectClient(Client &c, fd_set &activefds) {
+    c.isConnected = Client::DISCONNECTED;
+    if (c.fd != -1) {
+      FD_CLR(c.fd, &activefds);
+      close(c.fd);
+      c.fd = -1;
+    }
+  }
+
+  void handleNewConnection(fd_set &activefds, fd_set &readfds, int &maxfd, int &next_idx) {
+    if (!FD_ISSET(_listeningSocket._sockfd, &readfds))
+      return;
+
+    int connfd = accept(_listeningSocket._sockfd, NULL, NULL);
+    if (connfd < 0) {
+      cerr << "accept failed" << endl;
+      return;
+    }
+
+    FD_SET(connfd, &activefds);
+    if (connfd > maxfd)
+      maxfd = connfd;
+    clients[next_idx].fd = connfd;
+    clients[next_idx].isConnected = Client::CONNECTED;
+    next_idx++;
+  }
+
+  void handleClients(fd_set &activefds, fd_set &readfds, fd_set &writefds) {
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+      const bool readable = (clients[i].fd != -1) && FD_ISSET(clients[i].fd, &readfds);
+      const bool writable = (clients[i].fd != -1) && FD_ISSET(clients[i].fd, &writefds);
+
+      if (clients[i].isConnected == Client::CONNECTED && readable && writable) {
+        ssize_t read_bytes = recv(clients[i].fd, clients[i].buffer, sizeof(clients[i].buffer) - 1, 0);
+        if (read_bytes <= 0) {
+          disconnectClient(clients[i], activefds);
+        } else {
+          clients[i].buffer[read_bytes] = '\0';
+          const string response = processCommand(string(clients[i].buffer));
+          send(clients[i].fd, response.c_str(), response.size(), 0);
+        }
+      }
+    }
+  }
+
 public:
   Server(int port) : _listeningSocket(port) {}
 
   int run() {
     try {
       _listeningSocket.bindAndListen();
-      // Ready to accept connections. Logic for acception connection would go here.
-      std::cout << "ready" << std::endl;
+      cout << "ready" << endl;
 
       fd_set activefds, readfds, writefds;
       FD_ZERO(&activefds);
       FD_SET(_listeningSocket._sockfd, &activefds);
       int maxfd = _listeningSocket._sockfd;
-      int connfd;
       int next_idx = 0;
 
       while (1) {
         readfds = activefds;
         writefds = activefds;
-        if (select(maxfd + 1, &readfds, &writefds, NULL, NULL) < 0) {
-          std::cerr << "select failed" << std::endl;
-          continue;
-        }
-        if (FD_ISSET(_listeningSocket._sockfd, &readfds)) {
-          connfd = accept(_listeningSocket._sockfd, NULL, NULL);
-          if (connfd < 0) {
-            std::cerr << "accept failed" << std::endl;
-            continue;
-          }
-          FD_SET(connfd, &activefds);
-          if (connfd > maxfd)
-            maxfd = connfd;
-          clients[next_idx].fd = connfd;
-          clients[next_idx].isConnected = Client::CONNECTED;
-          next_idx++;
-        }
 
-        for (int i = 0; i < MAX_CLIENTS; i++) {
-          if (
-              clients[i].isConnected == Client::DISCONNECTED ||
-              !FD_ISSET(clients[i].fd, &readfds) ||
-              !FD_ISSET(clients[i].fd, &writefds))
-            continue;
-          ssize_t read_bytes = recv(clients[i].fd, clients[i].buffer, sizeof(clients[i].buffer) - 1, 0);
-          if (read_bytes < 0) {
-            clients[i].isConnected = Client::DISCONNECTED;
-            FD_CLR(clients[i].fd, &activefds);
-            close(clients[i].fd);
-            clients[i].fd = -1;
-          }
-          else {
-            clients[i].buffer[read_bytes] = '\0';
-            std::istringstream ss(std::string(clients[i].buffer));
-            std::string cmd, key, value;
-            ss >> cmd;
-            std::string response;
-            if (cmd == "GET") {
-              ss >> key;
-              value = database[key];
-              if (value.empty())
-                response = "1\n";
-              else
-                response = "0 " + value + "\n";
-            }
-            else if (cmd == "POST") {
-              ss >> key >> value;
-              database[key] = value;
-              response = "0\n";
-            }
-            else if (cmd == "DELETE") {
-              ss >> key;
-              if (database.erase(key))
-                response = "0\n";
-              else
-                response = "1\n";
-            }
-            else
-              response = "2\n";
-            send(clients[i].fd, response.c_str(), response.size(), 0);
-          }
+        int ready = select(maxfd + 1, &readfds, &writefds, NULL, NULL);
+        if (ready < 0) {
+          cerr << "select failed" << endl;
+        } else {
+          handleNewConnection(activefds, readfds, maxfd, next_idx);
+          handleClients(activefds, readfds, writefds);
         }
       }
       return 0;
     }
-    catch (const std::exception &e) {
-      std::cerr << "Error during server run: " << e.what() << std::endl;
-      return 1; // Return an error code if server fail to start
+    catch (const exception &e) {
+      cerr << "Error during server run: " << e.what() << endl;
+      return 1;
     }
   }
 };
@@ -201,7 +219,7 @@ public:
 int main(int argc, char **argv)
 {
   if (argc < 3) {
-    std::cerr << "Wrong number of arguments" << std::endl;
+    cerr << "Wrong number of arguments" << endl;
     return 1;
   }
   int port = atoi(argv[1]);
