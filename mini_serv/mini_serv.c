@@ -44,7 +44,7 @@ int	main(int argc, char **argv)
 		err("Wrong number of arguments");
 
 	struct sockaddr_in	servaddr;
-	socklen_t			len;
+	socklen_t			len; // man 2 accept
 
 	int	sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sockfd == -1) err(NULL);
