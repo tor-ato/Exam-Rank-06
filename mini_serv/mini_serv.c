@@ -14,7 +14,7 @@ typedef struct s_client
 }	t_client;
 
 t_client	clients[2048];
-fd_set		w_set, r_set, master;
+fd_set		w_set, r_set, master;　//man 2 select
 int			maxfd = 0, gid = 0;
 char		s_buf[1000000], r_buf[1000000];
 
