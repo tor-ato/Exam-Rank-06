@@ -59,8 +59,8 @@ int	main(int argc, char **argv)
 	servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 	servaddr.sin_port = htons(atoi(argv[1]));
 
-	if (bind(sockfd, (const struct sockaddr *)&servaddr, sizeof(servaddr)) != 0
-		|| listen(sockfd, 100) != 0)
+	if (bind(sockfd, (const struct sockaddr *)&servaddr, sizeof(servaddr)) == -1
+		|| listen(sockfd, 100) == -1)
 		err(NULL);
 
 	while (1)
