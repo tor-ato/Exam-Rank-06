@@ -92,8 +92,8 @@ int	main(int argc, char **argv)
 						sprintf(s_buf, "server: client %d just left\n", clients[fd].id);
 						send_to_all(fd);
 						bzero(s_buf, sizeof(s_buf));
-						FD_CLR(fd, &master);
 						bzero(clients[fd].msg, sizeof(clients[fd].msg));
+						FD_CLR(fd, &master);
 						close(fd);
 					}
 					else
@@ -103,7 +103,7 @@ int	main(int argc, char **argv)
 							clients[fd].msg[j] = r_buf[i];
 							if (clients[fd].msg[j] == '\n')
 							{
-								clients[fd].msg[j] = '\0';
+								clients[fd].msg[j] = 0;
 								sprintf(s_buf, "client %d: %s\n", clients[fd].id, clients[fd].msg);
 								send_to_all(fd);
 								bzero(s_buf, sizeof(s_buf));
