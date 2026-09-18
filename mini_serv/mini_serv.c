@@ -14,9 +14,9 @@ typedef struct s_client
 }	t_client;
 
 t_client	clients[2048];
-fd_set		w_set, r_set, master;　//man 2 select
+fd_set		w_set, r_set, master;
 int			maxfd = 0, gid = 0;
-char		s_buf[1000000], r_buf[1000000];
+char		s_buf[1000050], r_buf[1000000];
 
 void	err(char *msg)
 {
@@ -44,7 +44,6 @@ int	main(int argc, char **argv)
 		err("Wrong number of arguments");
 
 	struct sockaddr_in	servaddr;
-	socklen_t			len; // man 2 accept
 
 	int	sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sockfd == -1) err(NULL);
@@ -75,13 +74,13 @@ int	main(int argc, char **argv)
 			{
 				if (fd == sockfd)
 				{
-					int clientfd = accept(sockfd, (struct sockaddr *)&servaddr, &len);
-					if (clientfd == -1) err(NULL);
-					if (clientfd > maxfd) maxfd = clientfd;
-					FD_SET(clientfd, &master);
-					clients[clientfd].id = gid++;
-					sprintf(s_buf, "server: client %d just arrived\n", clients[clientfd].id);
-					send_to_all(clientfd);
+					int cfd = accept(sockfd, NULL, NULL);
+					if (cfd == -1) err(NULL);
+					if (cfd > maxfd) maxfd = cfd;
+					FD_SET(cfd, &master);
+					clients[cfd].id = gid++;
+					sprintf(s_buf, "server: client %d just arrived\n", clients[cfd].id);
+					send_to_all(cfd);
 					bzero(s_buf, sizeof(s_buf));
 				}
 				else
