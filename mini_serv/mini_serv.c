@@ -65,7 +65,7 @@ int	main(int argc, char **argv)
 	while (1)
 	{
 		r_set = w_set = master;
-		if (select(maxfd + 1, &r_set, &w_set, 0, 0) != -1)
+		if (select(maxfd + 1, &r_set, &w_set, 0, 0) == -1)
 			err(NULL);
 
 		for (int fd = 0; fd <= maxfd; fd++)
